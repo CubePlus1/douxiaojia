@@ -216,7 +216,7 @@ export default function MapPage() {
           抖小夹
         </h1>
         <p className="text-sm mt-1" style={{ color: "#888" }}>
-          共 {CATEGORIES.length * 18} 个收藏视频，{CATEGORIES.length} 个文件夹
+          共 {CATEGORIES.length * 9} 个收藏视频，{CATEGORIES.length} 个文件夹
         </p>
       </header>
 

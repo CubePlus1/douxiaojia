@@ -258,7 +258,7 @@ export default function SkillPanel({ onClose, categoryId }: { onClose: () => voi
       ? "28vh"
       : panelState === "result"
         ? "55vh"
-        : "65vh";
+        : "55vh";
 
   return (
     <div
@@ -319,7 +319,7 @@ export default function SkillPanel({ onClose, categoryId }: { onClose: () => voi
       {/* ════════════════ 初始状态 ════════════════ */}
       {panelState === "initial" && (
         <>
-          <div className="flex flex-col pt-1 items-center flex-1 overflow-y-auto min-h-0">
+          <div className="flex flex-col pt-1 items-center flex-1 justify-center overflow-y-auto min-h-0">
             <h2
               className="text-lg font-bold text-center"
               style={{ color: "#1A1A1A" }}
@@ -353,7 +353,7 @@ export default function SkillPanel({ onClose, categoryId }: { onClose: () => voi
           </div>
 
           {/* 输入栏 */}
-          <div className="flex items-center gap-2 pt-3 mt-auto flex-shrink-0">
+          <div className="flex items-center gap-2 pt-1 mt-auto flex-shrink-0">
             <input
               type="text"
               value={input}
@@ -365,7 +365,7 @@ export default function SkillPanel({ onClose, categoryId }: { onClose: () => voi
                 }
               }}
               placeholder="凝练收藏，一键生成技能包！"
-              autoFocus
+              autoFocus={false}
               className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
               style={{
                 background: "rgba(255,255,255,0.85)",

@@ -274,9 +274,9 @@ export default function CategoryPage({ params }: CategoryPageProps) {
       </div>
 
       {/* ── 三列视频网格 ── */}
-      <main className="flex-1 px-3 py-3 overflow-y-auto" style={{ paddingBottom: skillOpen ? "60vh" : "1rem" }}>
+      <main className="flex-1 px-3 py-3 overflow-hidden" style={{ paddingBottom: skillOpen ? "60vh" : "1rem" }}>
         <div className="grid grid-cols-3 gap-2">
-          {videos.slice(0, 12).map((video) => (
+          {videos.slice(0, 9).map((video) => (
             <div
               key={video.id}
               className="rounded-xl overflow-hidden relative"
