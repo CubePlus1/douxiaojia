@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const STEPS = [
-  { id: 1, text: "正在拉取你的抖音精选收藏夹...", icon: "📥" },
+  { id: 1, text: "正在载入示例视频数据...", icon: "📥" },
   { id: 2, text: "AI 正在分析视频内容...", icon: "🤖" },
   { id: 3, text: "按知识领域自动分类中...", icon: "🗂️" },
-  { id: 4, text: "唤醒你的知识收藏搭子...", icon: "🐾" },
+  { id: 4, text: "准备 AI 助手...", icon: "🤝" },
   { id: 5, text: "绘制专属知识地图...", icon: "🗺️" },
 ];
 
@@ -101,7 +101,7 @@ export default function LoadingPage() {
           className="text-center text-xl font-bold mb-8"
           style={{ color: "#1A1A1A", fontFamily: "Georgia, serif" }}
         >
-          正在整理你的抖音收藏夹
+          正在准备视频数据
         </h2>
 
         {/* 步骤列表 */}

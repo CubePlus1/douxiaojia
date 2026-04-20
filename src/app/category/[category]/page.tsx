@@ -261,8 +261,8 @@ export default function CategoryPage({ params }: CategoryPageProps) {
           <Image src={meta.botImage} alt={meta.name} width={32} height={32} className="object-contain" />
         </div>
         <div>
-          <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>抖小夹</p>
-          <p className="text-xs" style={{ color: "#999" }}>根据你的收藏视频智能总结</p>
+          <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>AI 助手</p>
+          <p className="text-xs" style={{ color: "#999" }}>根据视频内容智能总结</p>
         </div>
       </div>
 

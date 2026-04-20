@@ -297,7 +297,7 @@ export default function ChatPanel({
             className="text-lg font-bold text-center"
             style={{ color: "#1A1A1A" }}
           >
-            嗨～我是抖小夹，你的专属收藏整理小助手！
+            嗨～我是 AI 助手，帮你从视频内容里找答案！
           </h2>
           <p className="text-sm text-center mt-1" style={{ color: "#666" }}>
             快来问我♥️

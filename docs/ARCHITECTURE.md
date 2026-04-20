@@ -6,7 +6,7 @@
 
 ## 一、产品概述
 
-FavToSkill 将用户的抖音收藏视频自动整理为可对话、可交互的**知识地图**。
+FavToSkill 将用户收藏的视频自动整理为可对话、可交互的**知识地图**，并可一键生成 Claude Code Skill。
 
 核心用户价值：
 - 收藏了大量视频但从未回看？→ 自动分类，秒速召回
@@ -19,13 +19,13 @@ FavToSkill 将用户的抖音收藏视频自动整理为可对话、可交互的
 
 | 编号 | 功能 | 阶段 |
 |---|---|---|
-| F1 | Mock 抖音收藏视频（50 条，6 个领域） | Phase 1 |
+| F1 | Mock 视频数据（50 条，6 个领域） | Phase 1 |
 | F2 | 主页知识地图 — 瀑布流领域卡片 | Phase 1 |
 | F3 | 领域详情页 — 视频列表 | Phase 1 |
 | F4 | 响应式布局（手机 1 列 / PC 1 列，底图适配） | Phase 1 |
 | F5 | 对话侧边栏 — RAG 问答（流式） | Phase 2 |
 | F6 | 知识点 AI 自动总结 | Phase 2 |
-| F7 | 真实数据接入（TikTok 分享链接解析） | Phase 3 |
+| F7 | 真实数据接入（视频链接解析 / 文件导入） | Phase 3 |
 | F8 | 用户系统 + 数据持久化 | Phase 3 |
 
 ---
@@ -254,13 +254,13 @@ interface MockVideo {
   id: string;          // "video_001"
   title: string;       // "React 18 并发特性详解"
   description: string; // 100-300 字，用于 embedding
-  author: string;      // 抖音作者名
+  author: string;      // 作者名
   thumbnail: string;   // "https://picsum.photos/seed/video_001/400/300"
   category: VideoCategory;
   tags: string[];      // ["React", "前端", "并发"]
   duration: number;    // 视频时长（秒），如 183
   savedAt: string;     // ISO 8601，"2026-01-15T10:30:00Z"
-  url: string;         // "https://www.douyin.com/video/video_001"
+  url: string;         // 视频源链接
   viewCount: number;   // 收藏时的播放量（mock）
 }
 
@@ -433,7 +433,7 @@ npm run ingest
 ### Phase 3 — 完整 PoC
 目标：接近真实产品体验
 
-- [ ] 真实抖音数据接入（分享链接解析 / 文件导入）
+- [ ] 真实视频数据接入（链接解析 / 字幕抽取 / 文件导入）
 - [ ] 迁移向量库至 Supabase pgvector
 - [ ] LLM 自动分类（generateObject）
 - [ ] 用户系统（Supabase Auth）

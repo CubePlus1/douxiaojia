@@ -36,7 +36,7 @@ export interface MockVideo {
   category: CategoryId;
   savedAt: string; // ISO 8601
   transcript?: string; // 视频文字稿（用于 RAG）
-  // 以下字段在实际抖音数据中存在，mock 数据中可能缺失
+  // 以下字段源自视频元数据，mock 数据中可能缺失
   author?: string;
   thumbnail?: string;
   url?: string;

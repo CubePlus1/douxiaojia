@@ -213,10 +213,10 @@ export default function MapPage() {
       {/* ── 顶部标题 ── */}
       <header className="pt-8 pb-4 px-6">
         <h1 className="text-2xl font-bold" style={{ color: "#1A1A1A" }}>
-          抖小夹
+          FavToSkill
         </h1>
         <p className="text-sm mt-1" style={{ color: "#888" }}>
-          共 {CATEGORIES.length * 9} 个收藏视频，{CATEGORIES.length} 个文件夹
+          共 {CATEGORIES.length * 9} 个视频，{CATEGORIES.length} 个文件夹
         </p>
       </header>
 
