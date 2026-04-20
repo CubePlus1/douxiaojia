@@ -9,11 +9,9 @@ import { type CategoryId, getCategories } from "@/config/categories";
 import {
   type Skill,
   type SkillMetadata,
-  type SkillContent,
-  type SkillExample,
   type Video,
 } from "@/types/index";
-import { hasAIKey, getAIModel, buildSkillGenerationPrompt } from "@/lib/ai-client";
+import { getAIModel, buildSkillGenerationPrompt } from "@/lib/ai-client";
 
 // ─────────────────────────────────────────────
 // 辅助：获取分类展示名
@@ -34,15 +32,6 @@ export async function generateSkillWithAI(
   customName?: string,
   customDescription?: string
 ): Promise<Skill> {
-  if (!hasAIKey()) {
-    return generateSkillFromTemplate(
-      videos,
-      category,
-      customName,
-      customDescription
-    );
-  }
-
   const { generateObject } = await import("ai");
   const { z } = await import("zod");
   const model = await getAIModel();
@@ -122,99 +111,6 @@ export async function generateSkillWithAI(
   return {
     ...metadata,
     ...result.object,
-  };
-}
-
-// ─────────────────────────────────────────────
-// 模板生成（无需 API Key）
-// ─────────────────────────────────────────────
-
-export function generateSkillFromTemplate(
-  videos: Video[],
-  category: CategoryId,
-  customName?: string,
-  customDescription?: string
-): Skill {
-  const catDisplayName = getCategoryDisplayName(category);
-  const allTags = videos.flatMap((v) => v.tags);
-  const tagCounts = new Map<string, number>();
-  allTags.forEach((tag) => {
-    tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-  });
-  const topTags = Array.from(tagCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([tag]) => tag);
-
-  const skillName = customName || generateSkillName(category, topTags[0]);
-
-  const displayName = `${catDisplayName}知识助手`;
-  const description =
-    customDescription ||
-    `基于 ${videos.length} 个${catDisplayName}相关视频生成的知识技能包`;
-
-  const examples: SkillExample[] = [
-    {
-      userInput: `请介绍一下${catDisplayName}领域的核心概念`,
-      assistantOutput: `根据你收藏的视频，${catDisplayName}领域主要涵盖：${topTags.slice(0, 3).join("、")}等方面。这些是该领域的核心知识点。`,
-    },
-    {
-      userInput: `给我推荐几个${catDisplayName}相关的学习资源`,
-      assistantOutput: `基于你的收藏，我推荐以下内容：${videos.slice(0, 3).map((v) => v.title).join("、")}。这些资源涵盖了${catDisplayName}的重要知识。`,
-    },
-    {
-      userInput: `如何快速入门${catDisplayName}？`,
-      assistantOutput: `建议从以下步骤开始：1) 了解基础概念；2) 学习核心技能；3) 实践应用。你收藏的视频中有很多相关内容可以参考。`,
-    },
-  ];
-
-  const metadata: SkillMetadata = {
-    name: skillName,
-    displayName,
-    description,
-    category,
-    sourceVideoIds: videos.map((v) => v.id),
-    createdAt: new Date().toISOString(),
-  };
-
-  const content: SkillContent = {
-    trigger: `帮我学习${catDisplayName}知识`,
-    instructions: `你是一个${catDisplayName}领域的知识助手，基于用户收藏的 ${videos.length} 个视频内容提供帮助。
-
-核心知识点包括：${topTags.join("、")}。
-
-当用户提问时，你应该：
-1. 根据收藏视频的内容提供准确的回答
-2. 引用具体的视频标题作为知识来源
-3. 用简洁易懂的语言解释概念
-4. 提供实用的学习建议和实践方法
-5. 保持友好、专业的语气
-
-请帮助用户充分利用这些收藏的知识资源。`,
-    examples,
-    constraints: [
-      "仅基于用户收藏的视频内容回答问题",
-      "不编造不存在的视频或内容",
-      "保持客观，不过度夸张",
-      "承认不确定性，不强行解释",
-    ],
-    capabilities: [
-      `解答${catDisplayName}相关问题`,
-      "推荐学习资源和路径",
-      "提供实践建议",
-      "整理知识脉络",
-    ],
-    useCases: [
-      "快速查询特定知识点",
-      "制定学习计划",
-      "获取实践指导",
-      "复习巩固知识",
-    ],
-  };
-
-  return {
-    ...metadata,
-    ...content,
   };
 }
 
