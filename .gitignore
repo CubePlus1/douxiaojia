@@ -1,2 +1,17 @@
+# macOS / IDE
 .DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Baidu Comate
 .comate/
+
+# Package manager caches
+.pnpm-store/
+
+# Env / logs (root-level safety net; src/ has its own .gitignore)
+.env
+.env.local
+.env.*.local
+*.log
