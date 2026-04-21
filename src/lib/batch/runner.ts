@@ -19,6 +19,10 @@ export async function runBatchExtract(
     } catch (err) {
       const code = (err as { code?: string }).code ?? "EXTRACTOR_FAILED";
       const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[batch/runner] item[${i}] failed url=${items[i].url} code=${code}`,
+        err
+      );
       items[i] = { url: items[i].url, status: "failed", error: { code, message } };
       failure++;
     }

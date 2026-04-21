@@ -123,7 +123,10 @@ export const batchGenerateInputSchema = z.object({
           .max(MAX_DESCRIPTION_LENGTH)
           .optional()
           .default(""),
-        transcript: z.string().min(1, "视频字幕不能为空"),
+        transcript: z
+          .string()
+          .min(1, "视频字幕不能为空")
+          .max(MAX_TRANSCRIPT_LENGTH, `单个视频字幕最多 ${MAX_TRANSCRIPT_LENGTH} 字`),
         tags: z.array(z.string().max(MAX_TAG_LENGTH)).max(MAX_TAG_COUNT).default([]),
         url: z.string().url(),
       })
@@ -133,4 +136,5 @@ export const batchGenerateInputSchema = z.object({
   intent: intentSchema,
   category: categoryIdSchema,
   skillName: z.string().trim().min(1, "请填写 Skill 名"),
+  skillDescription: z.string().max(MAX_DESCRIPTION_LENGTH).optional(),
 });

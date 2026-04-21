@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
   let body: unknown;
   try {
     body = await req.json();
-  } catch {
+  } catch (err) {
+    console.warn(
+      "[batch-generate] failed to parse request body:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json({ error: "请求格式不正确" }, { status: 400 });
   }
 
@@ -35,7 +39,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { videos: inputVideos, intent: rawIntent, category, skillName } = parsed.data;
+  const {
+    videos: inputVideos,
+    intent: rawIntent,
+    category,
+    skillName,
+    skillDescription,
+  } = parsed.data;
   const intent = rawIntent ?? "";
 
   const nameCheck = validateSkillName(skillName);
@@ -62,11 +72,16 @@ export async function POST(req: NextRequest) {
     let retrievalContext: RetrievalContext | undefined;
     if (retrieval.strategy === "retrieved") {
       retrievalContext = { intent, chunks: retrieval.chunks, videoMap };
+    } else if (retrieval.notes.length > 0) {
+      console.warn(
+        "[batch-generate] retrieval fell back to full mode:",
+        retrieval.notes
+      );
     }
 
     // Map to internal Video type expected by generateSkillWithAI
     const savedAt = new Date().toISOString();
-    const videos: Video[] = inputVideos.map((v, i) => ({
+    const videos: Video[] = inputVideos.map((v) => ({
       id: v.id,
       title: v.title,
       description: v.description ?? "",
@@ -76,13 +91,13 @@ export async function POST(req: NextRequest) {
       transcript: v.transcript,
       author: v.author ?? undefined,
       url: v.url,
-      // duration not part of batch input
-    })) as Video[];
+    }));
 
     const skill = await generateSkillWithAI({
       videos,
       category,
       customName: skillName,
+      customDescription: skillDescription,
       retrievalContext,
     });
     const skillContent = generateSkillMarkdown(skill, videos);

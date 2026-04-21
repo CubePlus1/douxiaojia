@@ -60,11 +60,21 @@ export default function BatchPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ urls: cleaned }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error((data as { error?: string }).error ?? "批量抽取失败");
+        let errMsg = "批量抽取失败";
+        try {
+          const errData = (await res.json()) as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {
+          console.error(
+            "[batch/runExtract] non-JSON error response, status:",
+            res.status
+          );
+          errMsg = `批量抽取失败（HTTP ${res.status}）`;
+        }
+        throw new Error(errMsg);
       }
-      const batch = data as BatchResult;
+      const batch = (await res.json()) as BatchResult;
       setItems(batch.items);
       if (batch.successCount === 0) {
         setError("所有视频都抽取失败，检查链接或代理配置");
@@ -75,6 +85,7 @@ export default function BatchPage() {
       if (!skillName) setSkillName(suggestSkillName(firstTitle));
       setPhase("ready");
     } catch (e) {
+      console.error("[batch/runExtract] failed:", e);
       setError(e instanceof Error ? e.message : "网络错误");
       setPhase("idle");
     }
@@ -114,13 +125,25 @@ export default function BatchPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error((data as { error?: string }).error ?? "生成失败");
+        let errMsg = "生成失败";
+        try {
+          const errData = (await res.json()) as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {
+          console.error(
+            "[batch/runGenerate] non-JSON error response, status:",
+            res.status
+          );
+          errMsg = `生成失败（HTTP ${res.status}）`;
+        }
+        throw new Error(errMsg);
       }
-      setResult(data as GenerateSkillResponse);
+      const data = (await res.json()) as GenerateSkillResponse;
+      setResult(data);
       setPhase("done");
     } catch (e) {
+      console.error("[batch/runGenerate] failed:", e);
       setError(e instanceof Error ? e.message : "生成失败");
       setPhase("ready");
     }

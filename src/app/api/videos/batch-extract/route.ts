@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
   let body: unknown;
   try {
     body = await req.json();
-  } catch {
+  } catch (err) {
+    console.warn(
+      "[batch-extract] failed to parse request body:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "请求格式不正确" },
       { status: 400 }

@@ -50,6 +50,12 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const parsedIntent = intentSchema.safeParse(rawIntent);
+    if (!parsedIntent.success && rawIntent != null && rawIntent !== "") {
+      console.warn(
+        "[generate] intent validation failed, discarding:",
+        parsedIntent.error.issues[0]?.message
+      );
+    }
     const intent = parsedIntent.success ? (parsedIntent.data ?? "") : "";
 
     const parsedCategory = categoryIdSchema.safeParse(category);
@@ -132,6 +138,8 @@ export async function POST(req: NextRequest) {
         videoMap[v.id] = { title: v.title, index: i };
       });
       retrievalContext = { intent, chunks: retrieval.chunks, videoMap };
+    } else if (retrieval.notes.length > 0) {
+      console.warn("[generate] retrieval fell back to full mode:", retrieval.notes);
     }
 
     const skill = await generateSkillWithAI({

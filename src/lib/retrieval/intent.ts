@@ -15,7 +15,8 @@ export function _resetIntentCacheForTests() {
 }
 
 function cacheKey(ctx: IntentContext): string {
-  return `${ctx.intent.trim().toLowerCase()}|${ctx.titles.join("|").toLowerCase()}`;
+  const tagKey = [...ctx.tags].sort().join(",").toLowerCase();
+  return `${ctx.intent.trim().toLowerCase()}|${ctx.titles.join("|").toLowerCase()}|${tagKey}`;
 }
 
 function prune() {
@@ -45,6 +46,7 @@ export async function expandIntent(ctx: IntentContext): Promise<string[]> {
   try {
     const { hasAIKey, getAIModel } = await import("@/lib/ai-client");
     if (!hasAIKey()) {
+      console.warn("[intent] hasAIKey=false — skipping LLM expansion, using raw tokens");
       return baseTokens;
     }
     const { generateObject } = await import("ai");
