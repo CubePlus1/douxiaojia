@@ -57,11 +57,26 @@ export async function generateSkillWithAI(
       .describe("Skill 的展示名称，如「美食写作技巧」"),
     description: z.string().describe("一句话描述 Skill 的功能"),
     trigger: z.string().describe("触发词，如「教你写美食文案」"),
-    instructions: z
-      .string()
-      .describe(
-        "Skill 的核心指令，告诉 AI 应该如何表现，要具体可执行"
-      ),
+    // 小模型常把 instructions 理解成数组（每条一个 bullet）。用 preprocess
+    // 容忍 string / string[] 两种输出，数组自动合并为换行分隔的 markdown
+    // bullet list，保持最终 SKILL.md 可读。
+    instructions: z.preprocess(
+      (v) => {
+        if (Array.isArray(v)) {
+          return v
+            .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+            .map((x) => `- ${x.trim()}`)
+            .join("\n");
+        }
+        return v;
+      },
+      z
+        .string()
+        .min(1)
+        .describe(
+          "Skill 的核心指令，告诉 AI 应该如何表现，要具体可执行。可以是一段 markdown 文本。"
+        )
+    ),
     // 约束放到 description 里而不是 zod 硬限制——gpt-5.4-mini 级别的模型
     // 对 .length/.min/.max 这种硬约束命中率较差（经常返回 2 条或 4 条）。
     // 模型不严格遵守也能生成有效 Skill；总比报"schema mismatch"整个失败强。
