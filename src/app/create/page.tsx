@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CATEGORIES } from "@/config/categories";
 import CategoryPicker, {
   CategorySuggestion,
@@ -9,6 +9,9 @@ import CategoryPicker, {
 import GeneratedSkillModal from "@/components/create/GeneratedSkillModal";
 import ModeSwitch, { CreateMode } from "@/components/create/ModeSwitch";
 import SkillConfig from "@/components/create/SkillConfig";
+import UrlExtractor, {
+  type UrlExtractorResult,
+} from "@/components/create/UrlExtractor";
 import VideoForm, {
   VideoFormErrors,
   VideoFormValue,
@@ -75,6 +78,7 @@ function mapVideoErrors(value: unknown): VideoFormErrors {
 export default function CreatePage() {
   const [mode, setMode] = useState<CreateMode>("text");
   const [videoForm, setVideoForm] = useState<VideoFormValue>(initialVideoForm);
+  const [extractedDuration, setExtractedDuration] = useState<number>();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>();
   const [videoErrors, setVideoErrors] = useState<VideoFormErrors>({});
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -88,12 +92,12 @@ export default function CreatePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<CategorySuggestion | null>(null);
-
-  useEffect(() => {
-    if (!skillNameDirty) {
-      setSkillName(suggestSkillName(videoForm.title, selectedCategory));
-    }
-  }, [skillNameDirty, selectedCategory, videoForm.title]);
+  const [subtitleMeta, setSubtitleMeta] = useState<{
+    source: "manual" | "auto";
+    language: string;
+    isAuto: boolean;
+    charCount: number;
+  } | null>(null);
 
   const transcriptLength = videoForm.transcript.trim().length;
   const canAskAI = useMemo(
@@ -124,8 +128,20 @@ export default function CreatePage() {
     });
   };
 
+  const handleModeChange = (nextMode: CreateMode) => {
+    setMode(nextMode);
+
+    if (nextMode === "text") {
+      setExtractedDuration(undefined);
+      setSubtitleMeta(null);
+    }
+  };
+
   const handleVideoChange = (nextValue: VideoFormValue) => {
     setVideoForm(nextValue);
+    if (!skillNameDirty) {
+      setSkillName(suggestSkillName(nextValue.title, selectedCategory));
+    }
     setSubmitError(null);
     setSuggestion(null);
     clearFieldError("title");
@@ -134,6 +150,32 @@ export default function CreatePage() {
     clearFieldError("transcript");
     clearFieldError("tags");
     clearFieldError("url");
+  };
+
+  const handleExtracted = (result: UrlExtractorResult) => {
+    setVideoForm({
+      title: result.video.title,
+      author: result.video.author ?? "",
+      description: result.video.description ?? "",
+      transcript: result.video.transcript,
+      tags: result.video.tags ?? [],
+      url: result.video.url,
+    });
+    if (!skillNameDirty) {
+      setSkillName(suggestSkillName(result.video.title, selectedCategory));
+    }
+    setExtractedDuration(result.video.duration);
+    setSubtitleMeta({
+      source: result.meta.subtitleSource,
+      language: result.meta.language,
+      isAuto: result.meta.isAuto,
+      charCount: result.meta.charCount,
+    });
+    setSubmitError(null);
+    setCategoryError(null);
+    setSkillNameError(undefined);
+    setSuggestion(null);
+    setVideoErrors({});
   };
 
   const handleSuggestCategory = async () => {
@@ -169,6 +211,9 @@ export default function CreatePage() {
       }
 
       setSelectedCategory(data.category);
+      if (!skillNameDirty) {
+        setSkillName(suggestSkillName(videoForm.title, data.category));
+      }
       setSuggestion(data as CategorySuggestion);
       setCategoryError(null);
     } catch (error) {
@@ -185,7 +230,10 @@ export default function CreatePage() {
     setCategoryError(null);
     setSkillNameError(undefined);
 
-    const parsedVideo = videoInputSchema.safeParse(videoForm);
+    const parsedVideo = videoInputSchema.safeParse({
+      ...videoForm,
+      duration: extractedDuration,
+    });
 
     if (!parsedVideo.success) {
       setVideoErrors(mapVideoErrors(videoForm));
@@ -275,7 +323,15 @@ export default function CreatePage() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.82fr)]">
           <div className="space-y-6">
-            <ModeSwitch value={mode} onChange={setMode} />
+            <ModeSwitch value={mode} onChange={handleModeChange} />
+            {mode === "url" ? (
+              <UrlExtractor onExtracted={handleExtracted} />
+            ) : null}
+            {subtitleMeta?.source === "auto" ? (
+              <div className="rounded-[20px] border border-[#F1D48A] bg-[#FFF7D8] px-4 py-3 text-sm text-[#8A6420]">
+                当前为 AI 生成字幕，可能有错字。建议在生成 Skill 前先人工检查一遍。
+              </div>
+            ) : null}
             <VideoForm
               value={videoForm}
               errors={videoErrors}
@@ -286,6 +342,9 @@ export default function CreatePage() {
               value={selectedCategory}
               onChange={(value) => {
                 setSelectedCategory(value);
+                if (!skillNameDirty) {
+                  setSkillName(suggestSkillName(videoForm.title, value));
+                }
                 setCategoryError(null);
                 setSuggestion(null);
               }}
