@@ -185,7 +185,7 @@ function trimString(v?: string): string | undefined {
 
 /**
  * yt-dlp 的 --cookies 只接 Netscape 格式文件路径。
- * 用户在 .env.local 里填的通常是直接从浏览器拷的 "SESSDATA=xxx; bili_jct=yyy" 形式。
+ * 用户在 .env 里填的通常是直接从浏览器拷的 "SESSDATA=xxx; bili_jct=yyy" 形式。
  * 这里把字符串转成临时 cookie 文件，调用完由调用方清理临时目录。
  *
  * 如果用户传的本身就是已存在的文件路径（比如自己导出了 cookies.txt），直接用。

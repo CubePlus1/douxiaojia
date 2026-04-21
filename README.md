@@ -104,10 +104,10 @@ npm install
 
 ### 2. 配置环境变量
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-然后编辑 `.env.local`——`.env.example` 里每个变量都有详细说明、三套推荐 AI 预设（DashScope / OpenAI / 本地 Ollama）和常见坑提示。最少需要填：
+然后编辑 `.env`——`.env.example` 里每个变量都有详细说明、三套推荐 AI 预设（DashScope / OpenAI / 本地 Ollama）和常见坑提示。最少需要填：
 - `AI_API_KEY` + `AI_BASE_URL` + `AI_MODEL`（生成 Skill 必需）
 - `YOUTUBE_PROXY`（国内用 YouTube URL 模式必需）
 

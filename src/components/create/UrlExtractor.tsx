@@ -124,7 +124,7 @@ export default function UrlExtractor({ onExtracted }: UrlExtractorProps) {
       </div>
 
       <div className="mt-3 text-xs leading-6 text-[#738792]">
-        常见耗时 5 到 30 秒。国内访问 YouTube 需要在 .env.local 配
+        常见耗时 5 到 30 秒。国内访问 YouTube 需要在 .env 配
         <code className="mx-1 rounded bg-white px-1">YOUTUBE_PROXY</code>
         指向本机代理（如 <code className="rounded bg-white px-1">http://127.0.0.1:7897</code>）。
       </div>

@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 const MISSING_KEY_ERROR = {
   error:
-    "AI_API_KEY 未配置。分类建议依赖真实 LLM，请在 .env.local 中配置后重试。",
+    "AI_API_KEY 未配置。分类建议依赖真实 LLM，请在 .env 中配置后重试。",
 } as const;
 
 export async function POST(req: NextRequest) {

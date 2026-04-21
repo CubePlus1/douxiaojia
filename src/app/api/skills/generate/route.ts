@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error:
-            "AI_API_KEY 未配置。Skill 生成依赖真实 LLM，请在 .env.local 中配置后重试。",
+            "AI_API_KEY 未配置。Skill 生成依赖真实 LLM，请在 .env 中配置后重试。",
         } as GenerateSkillResponse,
         { status: 503 }
       );
