@@ -62,17 +62,19 @@ export async function expandIntent(ctx: IntentContext): Promise<string[]> {
 - 给领域相关的核心术语（如"attention" → "self-attention", "Q K V"）
 - 不要太泛（避免"机器学习"这种无意义宽词）`;
 
-    const { object } = await generateObject({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { object } = await (generateObject as any)({
       model: await getAIModel(),
       schema: Schema,
       mode: "json",
       prompt,
     });
 
-    CACHE.set(key, { keywords: object.keywords, expiresAt: Date.now() + TTL_MS });
+    const keywords = object.keywords as string[];
+    CACHE.set(key, { keywords, expiresAt: Date.now() + TTL_MS });
     prune();
 
-    const expanded = object.keywords.flatMap((k) => tokenize(k));
+    const expanded = keywords.flatMap((k: string) => tokenize(k));
     return Array.from(new Set([...baseTokens, ...expanded]));
   } catch (err) {
     console.warn("[intent] LLM expansion failed, falling back to raw tokens:", err);

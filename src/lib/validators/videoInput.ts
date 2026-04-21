@@ -80,3 +80,57 @@ export const videoClassificationSchema = videoInputSchema.pick({
   description: true,
   transcript: true,
 });
+
+export const MAX_INTENT_LENGTH = 300;
+export const MAX_BATCH_URLS = 10;
+
+export const intentSchema = z.preprocess(
+  EMPTY_TO_UNDEFINED,
+  z
+    .string()
+    .max(MAX_INTENT_LENGTH, `学习意图最多 ${MAX_INTENT_LENGTH} 字`)
+    .optional()
+);
+
+export const videoInputWithIntentSchema = videoInputSchema.extend({
+  intent: intentSchema,
+});
+
+export const batchExtractInputSchema = z.object({
+  urls: z
+    .array(z.string().trim().url("URL 格式不正确"))
+    .min(1, "至少提供 1 个 URL")
+    .max(MAX_BATCH_URLS, `最多支持 ${MAX_BATCH_URLS} 个视频`),
+});
+
+export const batchGenerateInputSchema = z.object({
+  videos: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        title: z
+          .string()
+          .trim()
+          .min(1, "视频标题不能为空")
+          .max(MAX_TITLE_LENGTH),
+        author: z
+          .string()
+          .max(MAX_AUTHOR_LENGTH)
+          .optional()
+          .default(""),
+        description: z
+          .string()
+          .max(MAX_DESCRIPTION_LENGTH)
+          .optional()
+          .default(""),
+        transcript: z.string().min(1, "视频字幕不能为空"),
+        tags: z.array(z.string().max(MAX_TAG_LENGTH)).max(MAX_TAG_COUNT).default([]),
+        url: z.string().url(),
+      })
+    )
+    .min(1, "至少 1 个视频")
+    .max(MAX_BATCH_URLS, `最多 ${MAX_BATCH_URLS} 个视频`),
+  intent: intentSchema,
+  category: categoryIdSchema,
+  skillName: z.string().trim().min(1, "请填写 Skill 名"),
+});
