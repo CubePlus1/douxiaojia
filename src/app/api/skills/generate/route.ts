@@ -49,14 +49,18 @@ export async function POST(req: NextRequest) {
       intent: rawIntent,
     } = body;
 
+    // intent is optional; present-but-invalid should be a 422 rather than silently discarded
     const parsedIntent = intentSchema.safeParse(rawIntent);
-    if (!parsedIntent.success && rawIntent != null && rawIntent !== "") {
-      console.warn(
-        "[generate] intent validation failed, discarding:",
-        parsedIntent.error.issues[0]?.message
+    if (!parsedIntent.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: parsedIntent.error.issues[0]?.message ?? "学习意图校验失败",
+        } as GenerateSkillResponse,
+        { status: 422 }
       );
     }
-    const intent = parsedIntent.success ? (parsedIntent.data ?? "") : "";
+    const intent = parsedIntent.data ?? "";
 
     const parsedCategory = categoryIdSchema.safeParse(category);
 

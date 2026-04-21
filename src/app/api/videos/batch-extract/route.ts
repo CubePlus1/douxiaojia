@@ -30,6 +30,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await runBatchExtract(parsed.data.urls);
+    if (result.successCount === 0) {
+      return NextResponse.json(
+        { ...result, error: "所有视频都抽取失败" },
+        { status: 422 }
+      );
+    }
     return NextResponse.json(result);
   } catch (err) {
     console.error("[batch-extract]", err);

@@ -70,4 +70,33 @@ describe("expandIntent", () => {
     expect(out).toContain("mechanism");
     expect((generateObject as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
   });
+
+  it("cache key includes tags (different tags → separate cache entries)", async () => {
+    (generateObject as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      object: { keywords: ["k"] },
+    });
+    await expandIntent({ intent: "x y", titles: ["t"], tags: ["a"] });
+    await expandIntent({ intent: "x y", titles: ["t"], tags: ["b"] });
+    // different tags → two distinct cache keys → two LLM calls
+    expect((generateObject as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2);
+  });
+
+  it("enforces MAX_ENTRIES ceiling under sustained load (no unbounded growth)", async () => {
+    (generateObject as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => ({ object: { keywords: ["k"] } })
+    );
+    // Hammer 150 distinct keys; cap is 100.
+    for (let i = 0; i < 150; i++) {
+      await expandIntent({
+        intent: `unique-${i}`,
+        titles: [`title-${i}`],
+        tags: [],
+      });
+    }
+    // After pruning, a key from the first 50 should be evicted and re-trigger an LLM call
+    const countBefore = (generateObject as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    await expandIntent({ intent: "unique-0", titles: ["title-0"], tags: [] });
+    const countAfter = (generateObject as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(countAfter).toBeGreaterThan(countBefore);
+  });
 });

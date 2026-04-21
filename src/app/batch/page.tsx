@@ -60,30 +60,36 @@ export default function BatchPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ urls: cleaned }),
       });
-      if (!res.ok) {
-        let errMsg = "批量抽取失败";
-        try {
-          const errData = (await res.json()) as { error?: string };
-          errMsg = errData.error ?? errMsg;
-        } catch {
-          console.error(
-            "[batch/runExtract] non-JSON error response, status:",
-            res.status
-          );
-          errMsg = `批量抽取失败（HTTP ${res.status}）`;
-        }
-        throw new Error(errMsg);
+
+      // The API returns 422 when every URL failed (still with items for UI);
+      // other non-ok statuses (400/500) mean the batch didn't even run.
+      let batch: (BatchResult & { error?: string }) | null = null;
+      try {
+        batch = (await res.json()) as BatchResult & { error?: string };
+      } catch {
+        console.error(
+          "[batch/runExtract] non-JSON response, status:",
+          res.status
+        );
       }
-      const batch = (await res.json()) as BatchResult;
-      setItems(batch.items);
-      if (batch.successCount === 0) {
-        setError("所有视频都抽取失败，检查链接或代理配置");
-        setPhase("idle");
+
+      if (batch && Array.isArray(batch.items)) {
+        setItems(batch.items);
+        if (batch.successCount === 0) {
+          setError(batch.error ?? "所有视频都抽取失败，检查链接或代理配置");
+          setPhase("idle");
+          return;
+        }
+        const firstTitle =
+          batch.items.find((i) => i.result)?.result?.title ?? "";
+        if (!skillName) setSkillName(suggestSkillName(firstTitle));
+        setPhase("ready");
         return;
       }
-      const firstTitle = batch.items.find((i) => i.result)?.result?.title ?? "";
-      if (!skillName) setSkillName(suggestSkillName(firstTitle));
-      setPhase("ready");
+
+      throw new Error(
+        batch?.error ?? `批量抽取失败（HTTP ${res.status}）`
+      );
     } catch (e) {
       console.error("[batch/runExtract] failed:", e);
       setError(e instanceof Error ? e.message : "网络错误");

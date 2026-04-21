@@ -61,4 +61,17 @@ describe("retrieveForSkill", () => {
     // title+tag tokens become the query; should match and return retrieved
     expect(res.strategy).toBe("retrieved");
   });
+
+  it("falls back to full with note when query token set ends up empty", async () => {
+    const { expandIntent } = await import("./intent");
+    (expandIntent as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    // Only stopwords — tokenizer returns nothing for title/tags/intent
+    const transcript = "zebra ".repeat(1000);
+    const res = await retrieveForSkill({
+      videos: [{ id: "v1", title: "", tags: [], transcript }],
+      intent: "",
+    });
+    expect(res.strategy).toBe("full");
+    expect(res.notes.some((n) => n.toLowerCase().includes("no query tokens"))).toBe(true);
+  });
 });
