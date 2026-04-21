@@ -151,7 +151,7 @@ export default function LandingPage() {
             {/* CTA 按钮 */}
             <button
               onClick={() => router.push("/create")}
-              className="w-full py-3 rounded-full text-white font-bold text-sm mb-3"
+              className="w-full py-3 rounded-full text-white font-bold text-sm mb-2"
               style={{
                 background: "#2C2C2C",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
@@ -166,7 +166,28 @@ export default function LandingPage() {
                 e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
               }}
             >
-              贴字幕生成 Skill
+              单视频 → Skill
+            </button>
+
+            <button
+              onClick={() => router.push("/batch")}
+              className="w-full py-3 rounded-full font-bold text-sm mb-3 border-2"
+              style={{
+                background: "white",
+                color: "#2C2C2C",
+                borderColor: "#2C2C2C",
+                transition: "transform 0.2s, box-shadow 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.15)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              批量 → 跨视频凝练
             </button>
 
             <p className="text-center text-xs text-gray-500">
