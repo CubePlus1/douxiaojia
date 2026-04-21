@@ -1,6 +1,23 @@
 # FavToSkill 技术架构文档
 
-> 版本：1.0.0 | 日期：2026-04-18 | 阶段：Demo 优先 → PoC
+> ⚠️ **已废弃** ⚠️
+>
+> 本文档写于 2026-04 黑客松原型阶段，描述的是"抖音收藏整理 + RAG 对话"的旧产品形态。
+> 项目已经 pivot 为「视频 → Claude Code Skill」单一动作工具，**整个 demo 流（/map, /category,
+> RAG, mock 数据）已删除**，技术栈也大变（去掉 Cloudflare / LangChain / Chroma / Supabase）。
+>
+> **当前架构**请看：
+> - [`README.md`](../README.md) — 现状概览 + ASCII pipeline 图
+> - [`design/README.md`](./design/README.md) — Phase A/B/C 索引
+> - [`design/01-video-to-skill.md`](./design/01-video-to-skill.md) — Phase A
+> - [`design/02-video-extraction.md`](./design/02-video-extraction.md) — Phase B（yt-dlp）
+> - [`design/03-intent-driven-rag.md`](./design/03-intent-driven-rag.md) — Phase C（规划中）
+>
+> 以下内容仅作历史参考。
+
+---
+
+> 版本：1.0.0 | 日期：2026-04-18 | 阶段：Demo 优先 → PoC（已废弃）
 
 ---
 
