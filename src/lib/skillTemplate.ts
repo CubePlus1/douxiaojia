@@ -58,6 +58,9 @@ export async function generateSkillWithAI(
       .describe(
         "Skill 的核心指令，告诉 AI 应该如何表现，要具体可执行"
       ),
+    // 约束放到 description 里而不是 zod 硬限制——gpt-5.4-mini 级别的模型
+    // 对 .length/.min/.max 这种硬约束命中率较差（经常返回 2 条或 4 条）。
+    // 模型不严格遵守也能生成有效 Skill；总比报"schema mismatch"整个失败强。
     examples: z
       .array(
         z.object({
@@ -65,23 +68,20 @@ export async function generateSkillWithAI(
           assistantOutput: z.string().describe("助手回复示例"),
         })
       )
-      .length(3)
-      .describe("3 个使用示例"),
+      .min(1)
+      .describe("2-3 个使用示例；每个要真实可用、不空泛"),
     constraints: z
       .array(z.string())
-      .min(2)
-      .max(5)
-      .describe("约束条件，如「不使用过度夸张的形容词」"),
+      .min(1)
+      .describe("2-5 条约束条件，如「不使用过度夸张的形容词」"),
     capabilities: z
       .array(z.string())
-      .min(3)
-      .max(6)
-      .describe("核心能力列表"),
+      .min(1)
+      .describe("3-6 条核心能力列表；每条具体可衡量"),
     useCases: z
       .array(z.string())
-      .min(3)
-      .max(5)
-      .describe("使用场景列表"),
+      .min(1)
+      .describe("3-5 条使用场景列表；每条具体到用户行为"),
   });
 
   const prompt = buildSkillGenerationPrompt(
@@ -90,11 +90,44 @@ export async function generateSkillWithAI(
     videoSummaries
   );
 
-  const result = await generateObject({
-    model,
-    schema: SkillSchema,
-    prompt,
-  });
+  // 重试机制：用 mode: "json" 让小模型走 JSON 模式而不是 tool-calling
+  // （gpt-5.4-mini 级别的模型对 function/tool-calling 支持较差）。
+  let result;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result = await (generateObject as any)({
+        model,
+        schema: SkillSchema,
+        mode: "json",
+        prompt,
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+      // 打印模型真实返回以便诊断 schema mismatch
+      const cause = err as {
+        text?: string;
+        response?: { text?: string };
+        message?: string;
+      };
+      console.warn(
+        `[generateSkillWithAI] attempt ${attempt + 1} failed:`,
+        cause.message?.slice(0, 200),
+        "| raw response (truncated):",
+        (cause.text ?? cause.response?.text ?? "").slice(0, 500)
+      );
+    }
+  }
+
+  if (!result) {
+    throw new Error(
+      `AI 模型未能生成符合结构的 Skill（已重试 3 次）。可能原因：模型输出不是合法 JSON、缺必需字段、或者字幕太短信息不足。底层错误：${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`
+    );
+  }
 
   const skillName =
     customName || generateSkillName(category, videos[0]?.tags[0]);
