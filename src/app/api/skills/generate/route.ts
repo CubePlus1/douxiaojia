@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { hasAIKey } from "@/lib/ai-client";
+import { hasAIKey, type RetrievalContext } from "@/lib/ai-client";
 import {
   generateSkillWithAI,
   generateSkillMarkdown,
@@ -15,6 +15,7 @@ import {
 import {
   categoryIdSchema,
   inlineVideosSchema,
+  intentSchema,
   MAX_TRANSCRIPT_LENGTH,
 } from "@/lib/validators/videoInput";
 import {
@@ -22,6 +23,7 @@ import {
   type GenerateSkillResponse,
   type Video,
 } from "@/types/index";
+import { retrieveForSkill } from "@/lib/retrieval";
 
 export const runtime = "nodejs";
 
@@ -38,13 +40,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body: GenerateSkillRequest = await req.json();
+    const body = (await req.json()) as GenerateSkillRequest & { intent?: string };
     const {
       category,
       videos: inlineVideos,
       skillName,
       skillDescription,
+      intent: rawIntent,
     } = body;
+
+    const parsedIntent = intentSchema.safeParse(rawIntent);
+    const intent = parsedIntent.success ? (parsedIntent.data ?? "") : "";
 
     const parsedCategory = categoryIdSchema.safeParse(category);
 
@@ -109,12 +115,32 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    const skill = await generateSkillWithAI(
+    const retrieval = await retrieveForSkill({
+      videos: videos.map((v) => ({
+        id: v.id,
+        title: v.title,
+        tags: v.tags,
+        transcript: v.transcript ?? "",
+      })),
+      intent,
+    });
+
+    let retrievalContext: RetrievalContext | undefined;
+    if (retrieval.strategy === "retrieved") {
+      const videoMap: RetrievalContext["videoMap"] = {};
+      videos.forEach((v, i) => {
+        videoMap[v.id] = { title: v.title, index: i };
+      });
+      retrievalContext = { intent, chunks: retrieval.chunks, videoMap };
+    }
+
+    const skill = await generateSkillWithAI({
       videos,
-      safeCategory,
-      skillName,
-      skillDescription
-    );
+      category: safeCategory,
+      customName: skillName,
+      customDescription: skillDescription,
+      retrievalContext,
+    });
     const skillContent = generateSkillMarkdown(skill, videos);
 
     return NextResponse.json({
