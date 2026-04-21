@@ -96,3 +96,61 @@ ${videoSummaries}
 # 输出格式
 请严格按照 JSON Schema 输出，不要添加额外字段。保持中文输出，语气友好专业。`;
 }
+
+// ─────────────────────────────────────────────
+// 提示词模板：检索片段模式（Phase C / 批量）
+// ─────────────────────────────────────────────
+
+import type { ScoredChunk } from "./retrieval/types";
+
+export interface RetrievalContext {
+  intent: string;
+  chunks: ScoredChunk[];
+  videoMap: Record<string, { title: string; index: number }>;
+}
+
+export function buildSkillGenerationPromptFromChunks(
+  input: {
+    displayTitle: string;
+    author?: string;
+    description?: string;
+    tags: string[];
+    category: string;
+    skillName: string;
+  },
+  ctx: RetrievalContext
+): string {
+  const intentLine = ctx.intent.trim()
+    ? `# 用户学习意图\n${ctx.intent}`
+    : `# 用户学习意图\n（未填写，请按片段综合主题生成通用 Skill）`;
+
+  const segments = ctx.chunks
+    .map((c) => {
+      const v = ctx.videoMap[c.sourceId];
+      const label = v ? `视频 ${v.index + 1}（${v.title}）` : c.sourceId;
+      const position = `${(c.startRatio * 100).toFixed(1)}%-${(c.endRatio * 100).toFixed(1)}%`;
+      return `---\n【${label}｜位置 ${position}】\n${c.text}`;
+    })
+    .join("\n");
+
+  return `你是 FavToSkill 的 Skill 生成助手。根据以下多视频检索出的关键片段，生成一份 Claude Code Skill。
+
+${intentLine}
+
+# Skill 元信息
+- 参考标题：${input.displayTitle}
+- 分类：${input.category}
+- 建议 skillName：${input.skillName}
+- 标签：${input.tags.join(", ")}
+${input.description ? `- 视频简介：${input.description}` : ""}
+
+# 检索到的相关片段（按视频+原顺序排列）
+${segments}
+
+# 硬要求
+1. instructions 必须紧扣"用户学习意图"——如果意图和片段不完全匹配，在 description 里诚实说明
+2. 每条 instructions 末尾用 [视频 N] 或 [视频 N+M] 标注来源（可多来源）
+3. 不要超出以上片段的信息范围胡编；不要补充片段外的知识
+4. 如果多个视频讲同一个点，合并成一条 instruction（去重）
+5. 输出 JSON（由上层 schema 校验）；instructions 是 markdown 字符串（一行一个要点，"- " 开头）`;
+}
