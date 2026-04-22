@@ -8,60 +8,62 @@
 
 ---
 
-## 视频 → Skill 模块：它到底做了什么
+## 两条路径：单视频 vs 批量
 
 ```
- ┌──────────────────────────────────────────────────────────────┐
- │                        用户输入                                │
- │   ① 贴视频 URL（YouTube / Bilibili）                          │
- │   ② 或手动粘贴 title + transcript + tags（文本模式）          │
- └──────────────────────────────┬───────────────────────────────┘
-                                ▼
- ┌──────────────────────────────────────────────────────────────┐
- │  Stage 1 · 视频抽取（Phase B，仅 URL 模式）                   │
- │                                                                │
- │   yt-dlp via youtube-dl-exec 子进程调用                       │
- │   ├─ Phase 1：--dump-single-json 拿元数据 + 字幕清单          │
- │   ├─ 挑最佳字幕：手工 CC 优先 > AI 自动字幕 > 排除弹幕轨       │
- │   └─ Phase 2：把选中的那一种语言字幕下载到临时目录             │
- │                                                                │
- │   字幕解析：SRT / VTT / Bilibili-JSON → 纯文本（剥时间戳）    │
- │                                                                │
- │   产出：title / author / description / transcript / tags /    │
- │         duration / thumbnailUrl + subtitleMeta                 │
- └──────────────────────────────┬───────────────────────────────┘
-                                ▼
- ┌──────────────────────────────────────────────────────────────┐
- │  Stage 2 · 分类（Phase A，可选）                              │
- │                                                                │
- │   POST /api/skills/classify                                    │
- │   └─ LLM + Zod z.enum 约束 → 7 个固定分类之一                  │
- │      （科技 / 解说 / 美食 / 旅行 / 人文 / 游戏 / 知识）         │
- │                                                                │
- │   fallback：无 AI_API_KEY 时返 503（不降级到关键词）          │
- └──────────────────────────────┬───────────────────────────────┘
-                                ▼
- ┌──────────────────────────────────────────────────────────────┐
- │  Stage 3 · Skill 生成（Phase A）                              │
- │                                                                │
- │   POST /api/skills/generate                                    │
- │   └─ Vercel AI SDK generateObject，mode: "json"                │
- │      │                                                         │
- │      ▼                                                         │
- │   Zod Schema（带容错 preprocess）：                            │
- │      displayName / description / trigger / instructions /      │
- │      examples[] / constraints[] / capabilities[] / useCases[]  │
- │      │                                                         │
- │      ▼                                                         │
- │   模板拼接 → SKILL.md（Markdown）                              │
- │                                                                │
- │   3 次自动重试；失败时给用户可操作的错误信息。                 │
- └──────────────────────────────┬───────────────────────────────┘
-                                ▼
-                   📄  下载 SKILL.md
-        ↓
-    放到 ~/.claude/skills/<skill-name>/SKILL.md
-    → Claude Code 启动自动加载，可按触发语激活
+                    ┌──────────┐
+                    │  /  首页  │
+                    └────┬─────┘
+                  ┌──────┴──────┐
+                  ▼             ▼
+           ┌──────────┐   ┌──────────┐
+           │ /create  │   │  /batch  │
+           │ 单视频   │   │ 1-10 个  │
+           └────┬─────┘   └────┬─────┘
+                │              │
+                │              ▼
+                │    ┌───────────────────────────┐
+                │    │ POST /api/videos/          │
+                │    │      batch-extract         │
+                │    │ yt-dlp 串行抓取            │
+                │    │ 单 URL 失败不阻塞          │
+                │    │ 全失败返 422 + items       │
+                │    └────────────┬──────────────┘
+                │                 │
+                ▼                 ▼
+     ┌──────────────────────────────────────┐
+     │ transcript + 用户学习意图（可选）    │
+     └──────────────────┬───────────────────┘
+                        ▼
+     ┌──────────────────────────────────────┐
+     │  src/lib/retrieval/ 自建 RAG 管线    │
+     │                                      │
+     │  1. 判断是否触发（总字数 ≥ 3000）    │
+     │  2. 意图 → LLM 关键词扩展（带 5min  │
+     │     缓存，失败回退到原词）           │
+     │  3. 所有视频 transcript 切片         │
+     │     （段落→句子，500-1000 字/片）    │
+     │  4. BM25-lite 打分（头部加权）       │
+     │  5. Jaccard 去重 → top-K=8           │
+     │                                      │
+     │  降级：命中为 0 时退回全量模式       │
+     └──────────────────┬───────────────────┘
+                        ▼
+     ┌──────────────────────────────────────┐
+     │ POST /api/skills/generate  (单视频) │
+     │ POST /api/skills/batch-generate (批) │
+     │                                      │
+     │ Vercel AI SDK generateObject         │
+     │   mode: "json" · 3 次重试            │
+     │ Zod schema（preprocess 容错）        │
+     │ 批量模式在 instructions 里标注       │
+     │   来源 [视频 N]                      │
+     └──────────────────┬───────────────────┘
+                        ▼
+              📄  下载 SKILL.md
+                        ↓
+         ~/.claude/skills/<skill-name>/SKILL.md
+         → Claude Code 启动自动加载
 ```
 
 ### 当前实现到哪一步
@@ -148,16 +150,18 @@ npm run dev
 
 ## 意图驱动的切片 RAG（Phase C · 已实施）
 
-**问题**：当前生成管线把整段 transcript 直接塞 prompt。长视频（>10k 字）被硬截断，后半段完全丢；且模型不知道用户真正想学什么，生成的 Skill 往往是"视频主题的平均描述"。
+**解决的问题**：长视频 transcript（>10k 字）被硬截断后半段丢失；模型不知道用户真正想学什么，生成的 Skill 往往是"视频主题的平均描述"。
 
-**目标**：让用户填一个「我想从这个视频学什么」字段，系统只把**与意图相关的片段**喂给 LLM，生成**针对性更强的 Skill**。
+**做法**：用户填写「我想学什么」字段，系统只把**与意图相关的片段**喂给 LLM。
 
-**方案**（详见 [`docs/design/03-intent-driven-rag.md`](docs/design/03-intent-driven-rag.md)）：
-- **C-1**：transcript 按段落 + 句子切成 500-1000 字的切片；用 BM25-lite 按意图 + 标题 + 标签打分，取 top-5；喂给 LLM。
-- **C-2**：用小模型把用户意图扩展成关键词列表（覆盖同义词），提升检索召回率。
-- **C-3**（暂缓）：真向量 embedding RAG——如果 C-1/C-2 不够好再上。
+**实际管线**（见 `src/lib/retrieval/`）：
+- **C-1 切片 + BM25**：transcript 按段落 + 句子切成 500-1000 字的切片；用 BM25-lite（头部 100 字加权 +2）按意图 + 标题 + 标签打分；Jaccard ≥ 0.7 去重；取 **top-8**。
+- **C-2 意图扩展**：小模型把用户意图扩展成 5-15 个同义词/变体（中英双语），加入关键词集。缓存 (intent, titles, tags) → keywords，5 分钟 TTL，100 条上限。LLM 调用失败时回退到原词。
+- **C-3 向量 embedding**：**没做**——BM25 + 意图扩展跑下来效果够用，没触发瓶颈。接口预留了 `strategy` 字段方便以后加。
 
-**为什么不直接上向量 RAG**：成本（多一次 embedding 调用 + 存储决策）换来的边际收益小；短视频 + 同质化字幕场景下，BM25 + 意图扩展的效果已经足够好。
+**批量和单视频共享同一套 retrieval**——区别只是批量会把多个视频的切片合成同一个 chunk pool，生成的 instructions 末尾标 `[视频 N]`。
+
+**为什么不直接上向量 RAG**：成本（多一次 embedding 调用 + 存储决策）换来的边际收益小；短视频 + 同质化字幕场景下，BM25 + 意图扩展已经够用。
 
 ---
 
@@ -181,12 +185,30 @@ npm run dev
 
 ---
 
+## 测试
+
+```bash
+cd src
+npm test              # 跑一次（vitest）
+npm run test:watch    # 开发模式
+npm run test:coverage # 生成覆盖率报告
+```
+
+- **61 个单元 / 集成测试**，全绿
+- `src/lib/retrieval/` 覆盖率 **93%**（切片 / 分词 / BM25 / 意图扩展 / 编排器）
+- 批量 runner 覆盖：串行、失败隔离、onProgress 回调
+- 所有新增 API 路由都有 happy path + 503 / 400 / 422 / 500 分支测试
+- UI 组件无测试——本地跑一下 `npm run dev` 肉眼验就完了，e2e 不值得上
+
+---
+
 ## 已知边界
 
 - **硬字幕视频抓不到**——字幕烧进画面像素需要 OCR 管线，本项目不做
-- **YouTube 新视频 JS 运行时**——yt-dlp 2025.12+ 开始对部分 YouTube 视频需要外挂 Deno/Node JS 运行时；极少数情况才触发
-- **小模型 JSON 输出不稳定**——Qwen2.5-7b 一类更小的模型偶发 schema mismatch。代码已内置 3 次重试 + JSON mode + schema preprocess 三层容错；换更大模型彻底规避
-- **长视频内容丢失**——transcript 超 10k 字硬截断。Phase C 落地后此问题消失（切片 + 检索替代截断）
+- **YouTube 新视频 JS 运行时**——yt-dlp 2025.12+ 对部分 YouTube 视频需要外挂 Deno/Node JS 运行时；极少数情况才触发
+- **小模型 JSON 输出不稳定**——Qwen2.5-7b 一类更小模型偶发 schema mismatch。代码已内置 3 次重试 + JSON mode + schema preprocess 三层容错；换更大模型彻底规避
+- **批量上限 10 个视频**——再多会被 yt-dlp 代理端口抢占 + 超时。真要更多请分批跑
+- **批量场景不支持 AI 自动分类**——意图跨多视频打分歧义太大，手动选分类即可
 
 ---
 
@@ -195,34 +217,53 @@ npm run dev
 ```
 src/
 ├── app/
-│   ├── page.tsx                         # Landing（单 CTA → /create）
-│   ├── create/page.tsx                  # 创建 Skill 主页面
+│   ├── page.tsx                         # Landing（双 CTA：/create + /batch）
+│   ├── create/page.tsx                  # 单视频创建流程
+│   ├── batch/page.tsx                   # 批量创建流程（状态机）
 │   └── api/
-│       ├── videos/extract/route.ts      # POST 抽取视频 metadata + 字幕
-│       ├── skills/classify/route.ts     # POST 分类推荐（LLM z.enum）
-│       └── skills/generate/route.ts     # POST 生成 SKILL.md
+│       ├── videos/extract/route.ts      # POST 单个视频抽取
+│       ├── videos/batch-extract/route.ts # POST 批量抽取（全失败返 422）
+│       ├── skills/classify/route.ts     # POST 分类推荐（仅单视频）
+│       ├── skills/generate/route.ts     # POST 单视频生成（已接入 retrieval）
+│       └── skills/batch-generate/route.ts # POST 批量生成（跨视频 RAG）
 │
-├── components/create/
-│   ├── ModeSwitch.tsx                   # 文本模式 / URL 模式切换
-│   ├── UrlExtractor.tsx                 # URL 输入 + 抽取触发
-│   ├── VideoForm.tsx                    # 视频信息表单
-│   ├── CategoryPicker.tsx               # 7 分类 chip grid
-│   ├── SkillConfig.tsx                  # Skill name + description
-│   └── GeneratedSkillModal.tsx          # 预览 + 下载
+├── components/
+│   ├── create/                          # 单视频 UI 组件
+│   │   ├── ModeSwitch.tsx               # 文本 / URL 模式切换
+│   │   ├── UrlExtractor.tsx
+│   │   ├── VideoForm.tsx
+│   │   ├── CategoryPicker.tsx
+│   │   ├── SkillConfig.tsx
+│   │   └── GeneratedSkillModal.tsx
+│   └── batch/                           # 批量 UI 组件
+│       ├── BatchUrlList.tsx             # 多 URL 可增删行
+│       ├── BatchExtractionProgress.tsx  # 每 URL 状态 chip
+│       ├── BatchVideoPreview.tsx        # 已抓视频卡片
+│       └── IntentField.tsx              # 学习意图 textarea
 │
 ├── lib/
-│   ├── ai-client.ts                     # OpenAI 兼容客户端 + prompt 模板
-│   ├── skillTemplate.ts                 # generateSkillWithAI（核心管线）
-│   ├── skillName.ts                     # 纯函数：name 校验 + 生成
-│   ├── validators/videoInput.ts         # Zod schemas
+│   ├── ai-client.ts                     # OpenAI 兼容客户端 + 两种 prompt 模板
+│   ├── skillTemplate.ts                 # generateSkillWithAI（接受 retrievalContext）
+│   ├── skillName.ts                     # kebab-case 生成 + 校验
+│   ├── validators/videoInput.ts         # Zod schemas（含批量 + 意图）
+│   ├── retrieval/                       # Phase C 自建 RAG 管线
+│   │   ├── types.ts                     # Chunk / ScoredChunk / RetrievalContext
+│   │   ├── tokenizer.ts                 # 中英双语分词（CN 2-4 gram）
+│   │   ├── chunker.ts                   # transcript → Chunk[]
+│   │   ├── bm25.ts                      # 打分 + Jaccard 去重 + top-K
+│   │   ├── intent.ts                    # LLM 意图扩展 + TTL 缓存
+│   │   └── index.ts                     # retrieveForSkill 编排器
+│   ├── batch/                           # 批量抽取子系统
+│   │   ├── types.ts                     # BatchItem / BatchResult
+│   │   └── runner.ts                    # 串行 + 失败隔离 + onProgress
 │   └── extractor/                       # yt-dlp 子系统（Phase B）
-│       ├── _runner.ts                   # 共享 yt-dlp 调用 + 字幕挑选
-│       ├── bilibili.ts                  # Bilibili extractor
-│       ├── youtube.ts                   # YouTube extractor
+│       ├── _runner.ts
+│       ├── bilibili.ts
+│       ├── youtube.ts
 │       ├── subtitle.ts                  # SRT / VTT / Bilibili-JSON 解析
 │       ├── registry.ts                  # URL → extractor 路由
 │       ├── errors.ts                    # 6 种错误码 + HTTP 状态映射
-│       └── types.ts                     # VideoExtractor 接口
+│       └── types.ts
 │
 └── config/
     └── categories.ts                    # 7 分类 single source of truth
@@ -232,11 +273,15 @@ src/
 
 ## 设计文档
 
-`docs/design/` 下：
+`docs/design/` 下（早期设计记录）：
 - [`README.md`](docs/design/README.md) — 索引 + 设计原则
-- [`01-video-to-skill.md`](docs/design/01-video-to-skill.md) — Phase A
-- [`02-video-extraction.md`](docs/design/02-video-extraction.md) — Phase B
-- [`03-intent-driven-rag.md`](docs/design/03-intent-driven-rag.md) — Phase C（规划中）
+- [`01-video-to-skill.md`](docs/design/01-video-to-skill.md) — Phase A（已实施）
+- [`02-video-extraction.md`](docs/design/02-video-extraction.md) — Phase B（已实施）
+- [`03-intent-driven-rag.md`](docs/design/03-intent-driven-rag.md) — Phase C（已实施）
+
+`docs/superpowers/` 下（批量 + RAG 落地记录）：
+- `specs/2026-04-22-batch-import-rag-design.md` — 批量 + 跨视频 RAG 设计
+- `plans/2026-04-22-batch-import-rag.md` — 21 步 TDD 实施计划
 
 ---
 
